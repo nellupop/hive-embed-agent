@@ -1,12 +1,12 @@
 """
 hive_crewai_agent.py
 ─────────────────────────────────────────────────────────────────────
-Hive Embed Bounty — Minimal CrewAI agent that mints + verifies a 
+Hive Embed Bounty — Minimal CrewAI agent that mints + verifies a
 Hive receipt, satisfying all eligibility requirements.
 
 SETUP
 -----
-1. pip install git+https://github.com/srotzin/crewai-hive.git crewai
+1. pip install -r requirements.txt
 2. Get a FREE Groq API key at console.groq.com (no credit card needed).
    Set it as GROQ_API_KEY env var, or paste it into the script below.
 3. Register once to get your referrer code:
@@ -18,39 +18,74 @@ SETUP
        "framework":  "crewai"
      }'
 
-3. Paste the returned referrer_code into REFERRER_CODE below.
-4. Set your GROQ_API_KEY (or swap in any LLM).
+4. Paste the returned referrer_code into REFERRER_CODE below.
 
 RUN
 ---
-   python hive_crewai_agent.py
+   python main.py
 
-A Hive receipt is minted on every agent step.  The receipt ID and 
-verify URL are printed at the end — submit that URL in your bounty 
+A Hive receipt is minted on every agent step. The receipt ID and
+verify URL are printed at the end — submit that URL in your bounty
 claim at https://thehiveryiq.com/bounty.
 """
 
+import json
 import os
-from crewai import Agent, Crew, Task, LLM
-from crewai_hive import HiveStepCallback  # pip install git+https://github.com/srotzin/crewai-hive.git
+import time
+from crewai import Agent, Crew, Task
+from langchain_groq import ChatGroq
+from crewai_hive import mint_receipt
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-# Paste your referrer code from the registration curl above.
+# Referrer code from the bounty registration response.
 REFERRER_CODE = os.getenv("HIVE_REFERRER_CODE", "bountyb77b4c68")
 
 # Free Groq API key — sign up at console.groq.com (no credit card needed).
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "gsk_REPLACE_ME")
 
-# Groq LLM — llama-3.3-70b is fast, free, and handles agent tasks well.
-llm = LLM(
-    model="groq/llama-3.3-70b-versatile",
-    api_key=GROQ_API_KEY,
+# Groq chat model used by the CrewAI agent.
+llm = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    groq_api_key=GROQ_API_KEY,
 )
 
-# ── HIVE CALLBACK ─────────────────────────────────────────────────────────────
-# HiveStepCallback intercepts each CrewAI step and mints a Hive receipt.
-# The tag= param is what attributes paid receipts to your referrer code.
-hive_cb = HiveStepCallback(tag=REFERRER_CODE)
+class RecordingHiveStepCallback:
+    def __init__(self, tag: str):
+        self.tag = tag
+        self.last_receipt_id = None
+
+    def __call__(self, step_output):
+        action_type = type(step_output).__name__
+        text = ""
+        tool = None
+        try:
+            if hasattr(step_output, "tool"):
+                tool = getattr(step_output, "tool", None)
+            text = (
+                getattr(step_output, "log", None)
+                or json.dumps(getattr(step_output, "return_values", {}) or {})
+                or str(step_output)
+            )
+        except Exception:
+            text = str(step_output)
+
+        metadata = {
+            "framework": "crewai",
+            "event": "agent_step",
+            "action_type": action_type,
+            "tool": tool,
+            "output_hash": __import__("hashlib").sha256(text.encode("utf-8")).hexdigest(),
+            "ts": int(time.time()),
+            "tag": self.tag,
+            "sdk": "crewai-hive",
+        }
+        rid = mint_receipt(metadata)
+        if rid:
+            self.last_receipt_id = rid
+            print(f"[hive] receipt {rid} → https://thehiveryiq.com/verify/?id={rid}")
+
+# ── HIVE CALLBACK ──────────────────────────────────────────��──────────────────
+hive_cb = RecordingHiveStepCallback(tag=REFERRER_CODE)
 
 # ── AGENT ─────────────────────────────────────────────────────────────────────
 researcher = Agent(
@@ -88,36 +123,26 @@ research_task = Task(
 crew = Crew(
     agents=[researcher],
     tasks=[research_task],
-    step_callback=hive_cb,  # <── mints a Hive receipt on every step
+    step_callback=hive_cb,
     verbose=True,
 )
 
 # ── RUN ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("
-=== Starting Hive-enabled CrewAI agent ===
-")
+    print("\n=== Starting Hive-enabled CrewAI agent ===\n")
     result = crew.kickoff()
 
-    print("
-=== Agent output ===")
+    print("\n=== Agent output ===")
     print(result)
 
-    # The HiveStepCallback stores the last receipt ID so you can build
-    # the verify URL immediately after the run.
     receipt_id = getattr(hive_cb, "last_receipt_id", None)
     if receipt_id:
         verify_url = f"https://thehiveryiq.com/verify/?id={receipt_id}"
-        print(f"
-✅  Hive receipt minted!")
+        print("\n✅  Hive receipt minted!")
         print(f"    Receipt ID : {receipt_id}")
         print(f"    Verify URL : {verify_url}")
-        print(f"
-👉  Submit this verify URL in your bounty claim at:")
-        print(f"    https://thehiveryiq.com/bounty
-")
+        print("\n👉  Submit this verify URL in your bounty claim at:")
+        print("    https://thehiveryiq.com/bounty\n")
     else:
-        print("
-⚠️  No receipt ID captured — check HiveStepCallback docs for the")
-        print("   correct attribute name, or inspect hive_cb after the run.
-")
+        print("\n⚠️  No receipt ID captured — check HiveStepCallback docs for the")
+        print("   correct attribute name, or inspect hive_cb after the run.\n")
