@@ -1,0 +1,2 @@
+crewai
+crewai-hive @ git+https://github.com/srotzin/crewai-hive.git
