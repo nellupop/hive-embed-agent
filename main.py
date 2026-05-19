@@ -85,13 +85,10 @@ crew = Crew(
 
 # ── RUN ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("
-=== Starting Hive-enabled CrewAI agent ===
-")
+    print("\n=== Starting Hive-enabled CrewAI agent ===\n")
     result = crew.kickoff()
 
-    print("
-=== Agent output ===")
+    print("\n=== Agent output ===")
     print(result)
 
     # The HiveStepCallback stores the last receipt ID so you can build
@@ -99,16 +96,11 @@ if __name__ == "__main__":
     receipt_id = getattr(hive_cb, "last_receipt_id", None)
     if receipt_id:
         verify_url = f"https://thehiveryiq.com/verify/?id={receipt_id}"
-        print(f"
-✅  Hive receipt minted!")
+        print("\n✅  Hive receipt minted!")
         print(f"    Receipt ID : {receipt_id}")
         print(f"    Verify URL : {verify_url}")
-        print(f"
-👉  Submit this verify URL in your bounty claim at:")
-        print(f"    https://thehiveryiq.com/bounty
-")
+        print("\n👉  Submit this verify URL in your bounty claim at:")
+        print("    https://thehiveryiq.com/bounty\n")
     else:
-        print("
-⚠️  No receipt ID captured — check HiveStepCallback docs for the")
-        print("   correct attribute name, or inspect hive_cb after the run.
-")
+        print("\n⚠️  No receipt ID captured — check HiveStepCallback docs for the")
+        print("   correct attribute name, or inspect hive_cb after the run.\n")
