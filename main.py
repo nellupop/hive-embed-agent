@@ -1,13 +1,15 @@
 """
-main.py
+hive_crewai_agent.py
 ─────────────────────────────────────────────────────────────────────
-Hive Embed Bounty — Minimal CrewAI agent that mints + verifies a
+Hive Embed Bounty — Minimal CrewAI agent that mints + verifies a 
 Hive receipt, satisfying all eligibility requirements.
 
 SETUP
 -----
 1. pip install git+https://github.com/srotzin/crewai-hive.git crewai
-2. Register once to get your referrer code:
+2. Get a FREE Groq API key at console.groq.com (no credit card needed).
+   Set it as GROQ_API_KEY env var, or paste it into the script below.
+3. Register once to get your referrer code:
 
    curl -s -X POST https://hivemorph.onrender.com/v1/bounty/register      -H "Content-Type: application/json"      -d '{
        "handle":     "@your_x_handle",
@@ -16,28 +18,34 @@ SETUP
        "framework":  "crewai"
      }'
 
-3. Leave HIVE_REFERRER_CODE unchanged so bounty tracking works.
-4. Set your OPENAI_API_KEY (or swap in any LLM).
+3. Paste the returned referrer_code into REFERRER_CODE below.
+4. Set your GROQ_API_KEY (or swap in any LLM).
 
 RUN
 ---
-   python main.py
+   python hive_crewai_agent.py
 
-A Hive receipt is minted on every agent step. The receipt ID and
-verify URL are printed at the end — submit that URL in your bounty
+A Hive receipt is minted on every agent step.  The receipt ID and 
+verify URL are printed at the end — submit that URL in your bounty 
 claim at https://thehiveryiq.com/bounty.
 """
 
 import os
-from crewai import Agent, Crew, Task
+from crewai import Agent, Crew, Task, LLM
 from crewai_hive import HiveStepCallback  # pip install git+https://github.com/srotzin/crewai-hive.git
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-# Referrer code from the bounty registration response.
-REFERRER_CODE = "bounty_b77b4c68"
+# Paste your referrer code from the registration curl above.
+REFERRER_CODE = os.getenv("HIVE_REFERRER_CODE", "bountyb77b4c68")
 
-# OpenAI key (or set OPENAI_API_KEY in your env).
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "sk-...")
+# Free Groq API key — sign up at console.groq.com (no credit card needed).
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "gsk_REPLACE_ME")
+
+# Groq LLM — llama-3.3-70b is fast, free, and handles agent tasks well.
+llm = LLM(
+    model="groq/llama-3.3-70b-versatile",
+    api_key=GROQ_API_KEY,
+)
 
 # ── HIVE CALLBACK ─────────────────────────────────────────────────────────────
 # HiveStepCallback intercepts each CrewAI step and mints a Hive receipt.
@@ -55,6 +63,7 @@ researcher = Agent(
         "You are a seasoned research analyst with expertise in synthesising "
         "information from diverse sources into actionable insights."
     ),
+    llm=llm,
     verbose=True,
     allow_delegation=False,
 )
@@ -85,10 +94,13 @@ crew = Crew(
 
 # ── RUN ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("\n=== Starting Hive-enabled CrewAI agent ===\n")
+    print("
+=== Starting Hive-enabled CrewAI agent ===
+")
     result = crew.kickoff()
 
-    print("\n=== Agent output ===")
+    print("
+=== Agent output ===")
     print(result)
 
     # The HiveStepCallback stores the last receipt ID so you can build
@@ -96,11 +108,16 @@ if __name__ == "__main__":
     receipt_id = getattr(hive_cb, "last_receipt_id", None)
     if receipt_id:
         verify_url = f"https://thehiveryiq.com/verify/?id={receipt_id}"
-        print("\n✅  Hive receipt minted!")
+        print(f"
+✅  Hive receipt minted!")
         print(f"    Receipt ID : {receipt_id}")
         print(f"    Verify URL : {verify_url}")
-        print("\n👉  Submit this verify URL in your bounty claim at:")
-        print("    https://thehiveryiq.com/bounty\n")
+        print(f"
+👉  Submit this verify URL in your bounty claim at:")
+        print(f"    https://thehiveryiq.com/bounty
+")
     else:
-        print("\n⚠️  No receipt ID captured — check HiveStepCallback docs for the")
-        print("   correct attribute name, or inspect hive_cb after the run.\n")
+        print("
+⚠️  No receipt ID captured — check HiveStepCallback docs for the")
+        print("   correct attribute name, or inspect hive_cb after the run.
+")
